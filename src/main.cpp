@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
-#include"Server.hpp"
+#include "Server.hpp"
 
 static bool parsePort(const char *s, unsigned short &out) {
     // Convert string to number and ensure 1..65535

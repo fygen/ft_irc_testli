@@ -17,6 +17,7 @@ namespace CMD {
     void NICK(Server &srv, int fd, const std::vector<std::string> &p);
     void USER(Server &srv, int fd, const std::vector<std::string> &p);
     void JOIN(Server &srv, int fd, const std::vector<std::string> &p);
+    void PART(Server &srv, int fd, const std::vector<std::string> &p);
     void PRIVMSG(Server &srv, int fd, const std::vector<std::string> &p);
     void MODE(Server &srv, int fd, const std::vector<std::string> &p);
     void TOPIC(Server &srv, int fd, const std::vector<std::string> &p);

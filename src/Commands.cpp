@@ -9,7 +9,6 @@
 #include <sstream>
 #include <cstdlib>
 
-
 static std::string prefixFor(Server &srv, Client *c) {
     // :nick!user@server
     std::string nick = c->nick().empty()? "*": c->nick();
@@ -145,6 +144,41 @@ void CMD::JOIN(Server &srv, int fd, const std::vector<std::string> &p) {
     srv.sendToClient(fd, RPL::endofnames(srv.serverName(), c->nick(), chan));
 }
 
+
+// PART <#chan>[,#chan2...] [:reason]
+void CMD::PART(Server &srv, int fd, const std::vector<std::string> &p) {
+    Client *c = srv.getClient(fd);
+    if (!c || !c->registered()) return;
+    if (p.size() < 1) {
+        srv.sendToClient(fd, ERR::needmoreparams(srv.serverName(), c->nick(), "PART"));
+        return;
+    }
+    std::string chanlist = p[0];
+    std::string reason = (p.size() >= 2) ? p[1] : "Leaving";
+    std::vector<std::string> chans = split(chanlist, ',');
+    for (size_t i = 0; i < chans.size(); ++i) {
+        std::string chan = chans[i];
+        if (chan.empty()) continue;
+        if (chan[0] != '#') chan = "#" + chan;
+        Channel *ch = srv.findChannel(toLower(chan));
+        if (!ch) {
+            srv.sendToClient(fd, ERR::nosuchchannel(srv.serverName(), c->nick(), chan));
+            continue;
+        }
+        if (!ch->isMember(fd)) {
+            srv.sendToClient(fd, ERR::notonchannel(srv.serverName(), c->nick(), chan));
+            continue;
+        }
+        std::string pre = prefixFor(srv, c);
+        std::string line = pre + "PART " + chan + " :" + reason + "\r\n";
+        // Notify others and self
+        srv.sendToChannel(chan, fd, line);
+        srv.sendToClient(fd, line);
+        // Remove membership and maybe destroy empty channel
+        ch->removeMember(fd);
+        if (ch->members().empty()) srv.removeChannelIfEmpty(ch->name());
+    }
+}
 // PRIVMSG <target> :text
 void CMD::PRIVMSG(Server &srv, int fd, const std::vector<std::string> &p) {
     Client *c = srv.getClient(fd);
@@ -355,10 +389,18 @@ void CMD::PING(Server &srv, int fd, const std::vector<std::string> &p) {
     srv.sendToClient(fd, pong);
 }
 
-// QUIT [:reason]
+
+// QUIT [#chan[,#chan2...]] | [:reason]
+// Note: Non-standard convenience: if the first param looks like a channel name ('#...'),
+// treat this as PART from the given channel(s) while keeping the connection open.
 void CMD::QUIT(Server &srv, int fd, const std::vector<std::string> &p) {
     Client *c = srv.getClient(fd);
     if (!c) return;
+    if (!p.empty() && !p[0].empty() && p[0][0] == '#') {
+        // Behave like PART
+        PART(srv, fd, p);
+        return;
+    }
     std::string reason = p.size()? p[0] : "Quit";
     srv.disconnectClient(fd, reason);
 }

@@ -11,8 +11,8 @@
 #include "Utils.hpp"
 #include <iostream>
 #include <cstring>
-#include <cerrno>
 #include <cstdio>
+#include <cerrno>
 
 Server::Server(const std::string &serverName, const std::string &password)
 : _serverName(serverName), _password(password), _listenFd(-1) {}
@@ -182,31 +182,55 @@ void Server::sendToChannel(const std::string &chan, int fromFd, const std::strin
     }
 }
 
+// Server.cpp
+
+// --- DÜZELTİLMİŞ SÜRÜM (satır satır açıklamalı) ---
 void Server::disconnectClient(int fd, const std::string &reason) {
-    Client *c = getClient(fd);
-    if (!c) return;
-    // Broadcast QUIT to joined channels and remove membership.
-    for (std::map<std::string, Channel*>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        Channel *ch = it->second;
-        if (ch->isMember(fd)) {
-            std::string prefix = ":" + (c->nick().empty()? "*":c->nick()) + "!" + c->user() + "@localhost ";
+    Client *c = getClient(fd);                                  // (1) fd’den client nesnesini al
+    if (!c) return;                                              // (2) Yoksa çık
+
+    // (3) _channels üzerinde dolaşırken erase etmeyeceğiz; boş kalanları sonra sileceğiz.
+    std::vector<std::string> toErase;                            // (4) Sonradan silinecek kanal adları
+
+    for (std::map<std::string, Channel*>::iterator it = _channels.begin();
+         it != _channels.end(); ++it) {                          // (5) Tüm kanallar üzerinde güvenli iterate
+        Channel *ch = it->second;                                // (6) Kanal ptr
+        if (!ch) continue;                                       // (7) Emniyet
+
+        if (ch->isMember(fd)) {                                  // (8) Bu client bu kanalda mı?
+            // (9) Kanal üyelerine QUIT yayını; ayrılan kişi kendisini görmez.
+            std::string prefix = ":" + (c->nick().empty()? "*":c->nick())
+                               + "!" + c->user() + "@localhost ";
             std::string quitmsg = prefix + "QUIT :" + reason + "\r\n";
-            sendToChannel(ch->name(), fd, quitmsg);
-            ch->removeMember(fd);
-            if (ch->members().empty()) removeChannelIfEmpty(ch->name());
+            sendToChannel(ch->name(), fd, quitmsg);              // (10) Üyelere gönder
+
+            ch->removeMember(fd);                                // (11) Üyelikten çıkar (op/invite de temizleniyor)
+
+            if (ch->members().empty()) {                         // (12) Kanal boşaldıysa
+                toErase.push_back(ch->name());                   // (13) Adını listeye ekle (şimdi değil, sonra sil)
+            }
         }
     }
-    // Remove nick->fd mapping
+
+    // (14) Artık iterator yok; güvenle sil
+    for (size_t i = 0; i < toErase.size(); ++i) {
+        removeChannelIfEmpty(toErase[i]);                        // (15) Kanalı map’ten kaldır (erase burada güvenli)
+    }
+
+    // (16) Nick -> fd haritasını temizle
     if (!c->nick().empty()) _nickToFd.erase(toLower(c->nick()));
-    // Remove from poll list
+
+    // (17) pollfd vektöründen bu fd’yi çıkar
     for (size_t i = 0; i < _pfds.size(); ++i) {
         if (_pfds[i].fd == fd) { _pfds.erase(_pfds.begin()+i); break; }
     }
-    // Close socket and free
+
+    // (18) Soketi kapat, client’ı map’ten çıkar ve bellekten sil
     ::close(fd);
     _clients.erase(fd);
     delete c;
 }
+
 
 void Server::handleClientEvent(size_t i) {
     struct pollfd &p = _pfds[i];

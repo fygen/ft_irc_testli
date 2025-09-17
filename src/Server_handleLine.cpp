@@ -8,7 +8,8 @@
 void Server::handleLine(int fd, const std::string &line) {
     // Parse and dispatch a single IRC command line.
     Client *c = getClient(fd);
-    if (!c) return;
+    if (!c) 
+		return;
     ParsedLine pl = parseIrcLine(line);
     std::string cmd = toLower(pl.command);
 
@@ -16,6 +17,7 @@ void Server::handleLine(int fd, const std::string &line) {
     else if (cmd == "nick") CMD::NICK(*this, fd, pl.params);
     else if (cmd == "user") CMD::USER(*this, fd, pl.params);
     else if (cmd == "join") CMD::JOIN(*this, fd, pl.params);
+    else if (cmd == "part") CMD::PART(*this, fd, pl.params);
     else if (cmd == "privmsg") CMD::PRIVMSG(*this, fd, pl.params);
     else if (cmd == "mode") CMD::MODE(*this, fd, pl.params);
     else if (cmd == "topic") CMD::TOPIC(*this, fd, pl.params);

@@ -50,7 +50,7 @@ run_client() {
     printf 'NICK %s\r\n' "$nick"
     printf 'USER %s 0 * :%s\r\n' "$user" "$user"
     printf 'JOIN %s\r\n' "$channel"
-    sleep 5
+    sleep 2
     printf 'PRIVMSG %s :%s says hello!\r\n' "$channel" "$name"
   } | nc localhost "$PORT" >"$out" 2>&1 &
 }
