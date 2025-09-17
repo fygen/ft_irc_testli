@@ -28,7 +28,7 @@ $(NAME): $(OBJ)
 
 clean:
 	rm -f $(OBJ)
-	rm -rf ./tests/output/*.txt
+	rm -rf ./tests/output
 
 fclean: clean
 	rm -f $(NAME)

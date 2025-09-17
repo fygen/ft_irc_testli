@@ -59,12 +59,11 @@ run_client() {
 topic_set_client() {
   local nick="$1" channel="$2" out="$3"
   {
-    sleep 0.2
     printf 'PASS %s\r\n' "$PASS"
     printf 'NICK %s\r\n' "$nick"
     printf 'USER %s 0 * :%s\r\n' "$nick" "$nick"
-    printf 'JOIN #topic_test\r\n'
-    printf 'TOPIC #topic_test : TOPIC_SET_WORKS\r\n'
+    printf 'JOIN %s\r\n' "$channel"
+    printf 'TOPIC %s : TOPIC_SET_WORKS\r\n' "$TOPIC_CHANNEL"
     sleep 1
   } | nc localhost "$PORT" >"$out" 2>&1 &
 }
@@ -73,15 +72,14 @@ topic_set_client() {
 inviter_client() {
   local nick="$1" channel="$2" out="$3" invitee="$4"
   {
-    sleep 0.1
     printf 'PASS %s\r\n' "$PASS"
     printf 'NICK %s\r\n' "$nick"
     printf 'USER %s 0 * :%s\r\n' "$nick" "$nick"
-    printf 'JOIN #%s\r\n' "$channel"
-    sleep 0.5
-    printf 'PRIVMSG #%s :Hello, I will invite %s!\r\n' "$channel" "$invitee"
-    printf 'MODE #%s +i\r\n' "$channel"
-    printf 'INVITE %s #%s\r\n' "$invitee" "$channel"
+    printf 'JOIN %s\r\n' "$channel"
+    printf 'MODE %s +i\r\n' "$channel"
+    printf 'PRIVMSG %s :Hello, I will invite %s!\r\n' "$channel" "$invitee"
+    sleep 0.3
+    printf 'INVITE %s %s\r\n' "$invitee" "$channel"
     sleep 1
   } | nc localhost "$PORT" >"$out" 2>&1 &
 }
@@ -90,12 +88,11 @@ inviter_client() {
 joiner_client() {
   local nick="$1" channel="$2" out="$3"
   {
-    sleep 0.2
     printf 'PASS %s\r\n' "$PASS"
     printf 'NICK %s\r\n' "$nick"
     printf 'USER %s 0 * :%s\r\n' "$nick" "$nick"
-    sleep 0.2
-    printf 'JOIN #%s\r\n' "$channel"
+    sleep 1
+    printf 'JOIN %s\r\n' "$channel"
     sleep 1
   } | nc localhost "$PORT" >"$out" 2>&1 &
 }
@@ -103,10 +100,12 @@ joiner_client() {
 # İki istemciyi bağla
 INVITER="inviter_user"
 INVITEE="invitee_user"
+TOPIC_SETTER="topic_setter_user"
 CLIENT1="Client1"
 CLIENT2="Client2"
 CLIENT3="Client3"
 CLIENT4="Client4"
+ALICE="alice"
 CHANNEL="#test"
 TOPIC_CHANNEL="#topic_test"
 INVITE_CHANNEL="#invite"
@@ -115,18 +114,18 @@ INVITE_CHANNEL="#invite"
 # TOPIC TESTI
 # JOINER TESTI 
 # INVITER JOINER TESTI
-# 
 
-inviter_client "$INVITER" "$INVITE_CHANNEL" "$OUT/inviter_output.txt" "$INVITEE"
-topic_set_client "topic_setter_user" "$TOPIC_CHANNEL" "$OUT/topic_setter_output.txt"
 
-run_client "$CLIENT1" "$CLIENT1"  "Test User"  "$CHANNEL" "$OUT/client1_output.txt"
-run_client "$CLIENT2" "$CLIENT2" "Test User2" "$CHANNEL" "$OUT/client2_output.txt"
+inviter_client "$INVITER" "$INVITE_CHANNEL" "$OUT/$INVITER.txt" "$INVITEE"
+topic_set_client "$TOPIC_SETTER" "$TOPIC_CHANNEL" "$OUT/$TOPIC_SETTER.txt"
 
-run_client "$CLIENT1" "$CLIENT1" "Test User" "$TOPIC_CHANNEL" "$OUT/client1_topic_output.txt"
-run_client "$CLIENT2" "$CLIENT2" "Test User2" "$TOPIC_CHANNEL" "$OUT/client2_topic_output.txt"
-joiner_client "$INVITEE" "$CHANNEL" "$OUT/joiner_output.txt"
-joiner_client "alice" "$CHANNEL" "$OUT/alice_output.txt"
+run_client "$CLIENT1" "$CLIENT1"  "Test User"  "$CHANNEL" "$OUT/$CLIENT1.txt"
+run_client "$CLIENT2" "$CLIENT2" "Test User2" "$CHANNEL" "$OUT/$CLIENT2.txt"
+
+run_client "$CLIENT3" "$CLIENT3" "Test User3" "$TOPIC_CHANNEL" "$OUT/$CLIENT3.txt"
+run_client "$CLIENT4" "$CLIENT4" "Test User4" "$TOPIC_CHANNEL" "$OUT/$CLIENT4.txt"
+joiner_client "$INVITEE" "$INVITE_CHANNEL" "$OUT/$INVITEE.txt"
+joiner_client "$ALICE" "$INVITE_CHANNEL" "$OUT/$ALICE.txt"
 
 # Kayıtlı pinger ile PING/PONG testi
 {
@@ -145,25 +144,25 @@ sleep 8
 pass=true
 
 
-if ! grep -Eq ' 001 |Welcome' "$OUT/client1_output.txt"; then
+if ! grep -Eq ' 001 |Welcome' "$OUT/$CLIENT1.txt"; then
   echo "[FAIL] Client1 did not receive welcome."; pass=false
 else
   echo "[OK] Client1 welcome received."
 fi
 
-if ! grep -Eq ' 001 |Welcome' "$OUT/client2_output.txt"; then
+if ! grep -Eq ' 001 |Welcome' "$OUT/$CLIENT2.txt"; then
   echo "[FAIL] Client2 did not receive welcome."; pass=false
 else
   echo "[OK] Client2 welcome received."
 fi
 
-if ! grep -q 'Client1 says hello!' "$OUT/client2_output.txt"; then
+if ! grep -q 'Client1 says hello!' "$OUT/$CLIENT2.txt"; then
   echo "[FAIL] Client2 did not receive Client1 message."; pass=false
 else
   echo "[OK] Channel message delivered to Client2."
 fi
 
-if ! grep -q 'Client2 says hello!' "$OUT/client1_output.txt"; then
+if ! grep -q 'Client2 says hello!' "$OUT/$CLIENT1.txt"; then
   echo "[FAIL] Client1 did not receive Client2 message."; pass=false
 else
   echo "[OK] Channel message delivered to Client1."
@@ -175,25 +174,25 @@ else
   echo "[WARN] No PONG seen in ping_output.txt (server may require registered client)."
 fi
 
-if grep -q 'TOPIC_SET_WORKS' "$OUT/client1_topic_output.txt" && grep -q 'TOPIC_SET_WORKS' "$OUT/client2_topic_output.txt"; then
+if grep -q 'TOPIC_SET_WORKS' "$OUT/$CLIENT3.txt" && grep -q 'TOPIC_SET_WORKS' "$OUT/$CLIENT4.txt"; then
   echo "[OK] Topic change propagated to clients."
 else
   echo "[FAIL] Topic change not seen by clients."; pass=false
 fi
 
-if grep -q 'INVITE invitee_user #test' "$OUT/inviter_output.txt"; then
+if grep -q "$INVITER $INVITEE $INVITE_CHANNEL" "$OUT/$INVITER.txt"; then
   echo "[OK] Inviter sent INVITE command."
 else
   echo "[FAIL] Inviter did not send INVITE command."; pass=false
 fi
 
-if grep -q 'INVITE from' "$OUT/joiner_output.txt"; then
+if grep -q "INVITE $INVITEE :$INVITE_CHANNEL" "$OUT/$INVITEE.txt"; then
   echo "[OK] Invitee received INVITE."
 else
   echo "[FAIL] Invitee did not receive INVITE."; pass=false
 fi
 
-if grep -q ' 473 ' "$OUT/alice_output.txt"; then
+if grep -q ' 473 ' "$OUT/$ALICE.txt"; then
   echo "[OK] Invitee was correctly blocked from joining +i channel."
 else
   echo "[FAIL] Invitee was not blocked from joining +i channel."; pass=false
