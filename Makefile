@@ -35,9 +35,7 @@ fclean: clean
 
 re: fclean all
 
-# 	./tests/test_runner.sh 4444 4444
-#	./tests/test3.sh 4444 4444
-test: all
+test: clean all
 	@echo "Running tests..."
 	# Add your test commands here
 	./tests/test_run2.sh 4444 4444
