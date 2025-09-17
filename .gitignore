@@ -1,2 +1,3 @@
-./tests/output/
-.o
+/tests/output/
+*.o
+ircserv
